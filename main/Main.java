@@ -27,6 +27,10 @@ import phone.model.Organization;
 import phone.model.Person;
 import phone.model.PhoneNumber;
 import phone.storage.ContactFileManager;
+import phone.view.BasicContactView;
+import phone.view.ContactView;
+import phone.view.FullDetailsDecorator;
+import phone.view.MetadataDecorator;
 
 import userfunction.command.ChangePasswordCommand;
 import userfunction.command.ProfileCommand;
@@ -39,9 +43,9 @@ import userfunction.command.UpdateUserNameCommand;
 /*
  
    @author: Abhilaksh
-   @version: UC4
+   @version: UC5
    
-   " User adds a new contact with name, phone numbers, email addresses, and optional fields."
+   "User views complete information of a specific contact."
 */
 
 public class Main {
@@ -454,7 +458,7 @@ public class Main {
 					yield true;
 				}
 				case "2" -> {
-					System.out.println("To be implemented...");
+					viewSpecificContactFlow(activeUser);
 					yield true;
 				}
 				case "0" -> {
@@ -503,6 +507,17 @@ public class Main {
 		};
 
 	}
+
+	private static Optional<Contact> getContactByIndex(User user, int index){
+		List<Contact> contacts = user.getContacts();
+		
+		if(index >= 0 && index < contacts.size()) {
+			return Optional.of(contacts.get(index));
+		}
+		
+		return Optional.empty();
+	}
+
 
 	public static void main(String[]args) {
 		System.out.println("///////////////////////// Welcome to MyContactsApp ///////////////////////");
