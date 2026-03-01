@@ -40,6 +40,9 @@ import userfunction.command.UpdatePhoneNumberCommand;
 import userfunction.command.UpdateTierCommand;
 import userfunction.command.UpdateUserNameCommand;
 
+import phone.observer.ContactObserver;
+import phone.observer.DeletionLogger;
+
 import com.seveneleven.mycontactapp.contact.command.ContactCommandController;
 import com.seveneleven.mycontactapp.contact.command.EditContactCommand;
 import com.seveneleven.mycontactapp.contact.command.ContactCommand;
@@ -47,9 +50,9 @@ import com.seveneleven.mycontactapp.contact.command.ContactCommand;
 /*
  
    @author: Abhilaksh
-   @version: UC6
+   @version: UC7
    
-   " Logged-in User: User modifies existing contact information."
+   "User removes a contact from their list with confirmation."
 */
 
 public class Main {
@@ -522,6 +525,124 @@ public class Main {
 			}
 		}catch(NumberFormatException e) {
 			System.out.println("Please enter a valid number.");
+		}
+	}
+
+	public static void handleRecycleBinFlow(User activeUser) {
+        List<Contact> bin = activeUser.getRecycleBin();
+        List<Contact> activeContacts = activeUser.getContacts();
+
+        if (bin.isEmpty()) {
+            System.out.println("\nYour Recycle Bin is currently empty.");
+            return;
+        }
+
+        System.out.println("\n--- Recycle Bin ---");
+        System.out.println("Note: Contacts here will be permanently lost when you log out or close the app.");
+        System.out.println("----------------------");
+        
+        for (int i = 0; i < bin.size(); i++) {
+            System.out.println("[" + (i + 1) + "] " + bin.get(i).getName() + " (" + bin.get(i).getContactType() + ")");
+        }
+
+        System.out.print("\nEnter number to restore (0 to cancel, 'clear' to empty bin): ");
+        String input = scanner.nextLine();
+
+        if (input.equals("0")) return;
+        
+        if (input.equalsIgnoreCase("clear")) {
+            for (Contact c : bin) {
+                c.cascadeDelete(); 
+            }
+            bin.clear();
+            System.out.println("Recycle Bin emptied. All contacts permanently destroyed.");
+            return;
+        }
+
+        try {
+            int choice = Integer.parseInt(input);
+            int index = choice - 1;
+
+            if (index < 0 || index >= bin.size()) {
+                System.out.println("Invalid contact number.");
+                return;
+            }
+
+            Contact contactToRestore = bin.remove(index);
+            activeContacts.add(contactToRestore);
+            ContactFileManager.saveContacts(activeUser);
+            
+            System.out.println("Contact '" + contactToRestore.getName() + "' successfully restored to your active list!");
+
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input. Please enter a number or 'clear'.");
+        }
+    }
+	
+	/**
+	 * Handles the contact deletion flow
+	 * 
+	 * @param activeUser The current user
+	 */
+	public static void deleteContactFlow(User activeUser) {
+		List<Contact> contacts = activeUser.getContacts();
+
+		if(contacts.isEmpty()) {
+			System.out.println("\nYour address book is empty.");
+		}
+
+		System.out.println("\n---Delete a Contact---");
+		for(int i = 0; i < contacts.size(); i++) {
+			System.out.println("[" + (i + 1) + "] " + contacts.get(i).getName() + " (" + contacts.get(i).getContactType() +")");
+		}
+
+		System.out.print("\nEnter number of delete (0 to cancel): ");
+		try {
+			int choice = Integer.parseInt(scanner.nextLine());
+
+			if(choice == 0) return;
+
+			int index = choice - 1;
+			if(index < 0 || index >= contacts.size()) {
+				System.out.println("Invalid contact number");
+			}
+
+			Contact contact = contacts.get(index);
+
+			System.out.print("Are you sure you want to delete " + contact.getName() + "?(y/n): ");
+			if(!scanner.nextLine().equalsIgnoreCase("y")) {
+				System.out.println("Deletion cancelled");
+				return;
+			}
+
+			System.out.println("\n---Select Deletion Type---");
+			System.out.println("1. Soft Delete (Moves to Recycle Bin)");
+			System.out.println("2. Hard Delete (Permanent Delete)");
+			System.out.print("Choice: ");
+			String delType = scanner.nextLine();
+
+			if("1".equals(delType)) {
+				activeUser.getRecycleBin().add(contact);
+				contacts.remove(index);
+				
+				notifyObservers(contact, false);
+				System.out.println("Contact moved to recylce bin");
+				
+			}else if("2".equals(delType)) {
+				contacts.remove(index);
+				contact.cascadeDelete();
+				
+				notifyObservers(contact, true);
+				System.out.println("Contact permanently destroyed");
+			} else {
+				System.out.println("Please Enter a valid number: Deletion cancelled");
+				return;
+			}
+			
+			ContactFileManager.saveContacts(activeUser);
+
+		}catch(NumberFormatException e) {
+			System.out.println("Exeption: please enter numbers only!!");
 		}
 	}
 
