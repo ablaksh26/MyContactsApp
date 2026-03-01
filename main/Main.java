@@ -32,6 +32,10 @@ import phone.view.ContactView;
 import phone.view.FullDetailsDecorator;
 import phone.view.MetadataDecorator;
 
+import phone.sort.ContactSortStrategy;
+import phone.sort.SortByDateStrategy;
+import phone.sort.SortByNameStrategy;
+
 import userfunction.command.ChangePasswordCommand;
 import userfunction.command.ProfileCommand;
 import userfunction.command.ProfileUpdateController;
@@ -55,9 +59,9 @@ import com.seveneleven.mycontactapp.contact.command.ContactCommand;
 /*
  
    @author: Abhilaksh
-   @version: UC9
+   @version: UC10
    
-   "User searches contacts by name, phone, email, or tags."
+   "User applies multiple filters (by tag, date added, frequently contacted)."
 */
 
 public class Main {
@@ -779,6 +783,82 @@ public class Main {
         }
         System.out.println("-----------------------");
     }
+
+	public static void handleAdvancedFilterFlow(User activeUser) {
+		List<Contact> contacts = activeUser.getContacts();
+		if (contacts.isEmpty()) {
+			System.out.println("\nYour address book is empty.");
+			return;
+		}
+
+		List<SearchCriteria> activeFilters = new ArrayList<>();
+		boolean addingFilters = true;
+
+		System.out.println("\n--- Advanced Multi-Level Filtering ---");
+
+		while (addingFilters) {
+			System.out.println("\nCurrent Active Filters: " + activeFilters.size());
+			System.out.println("1. Add Tag Filter");
+			System.out.println("2. Add Date Added Filter (Last X days)");
+			System.out.println("3. Add Name Prefix Filter");
+			System.out.println("0. Done adding filters, proceed to sorting");
+			System.out.print("Choice: ");
+
+			String choice = scanner.nextLine();
+			switch (choice) {
+			case "1" -> {
+				System.out.print("Enter tag to filter by: ");
+				activeFilters.add(new TagCriteria(scanner.nextLine()));
+			}
+			case "2" -> {
+				System.out.print("Show contacts added in the last how many days?: ");
+				try {
+					activeFilters.add(new DateAddedCriteria(Integer.parseInt(scanner.nextLine())));
+				} catch (Exception e) {
+					System.out.println("Invalid number.");
+				}
+			}
+			case "3" -> {
+				System.out.print("Name starts with: ");
+				activeFilters.add(new NameCriteria(scanner.nextLine()));
+			}
+			case "0" -> addingFilters = false;
+			default -> System.out.println("Invalid choice.");
+			}
+		}
+
+
+		SearchCriteria compositeFilter = new AndCriteria(activeFilters);
+
+
+		System.out.println("\nSelect Sorting Strategy:");
+		System.out.println("1. Alphabetical (By Name)");
+		System.out.println("2. Newest First (By Date Added)");
+		System.out.print("Choice: ");
+
+		ContactSortStrategy sortStrategy;
+		if ("2".equals(scanner.nextLine())) {
+			sortStrategy = new SortByDateStrategy();
+		} else {
+			sortStrategy = new SortByNameStrategy(); 
+		}
+
+		List<Contact> results = contacts.stream()
+				.filter(compositeFilter) 
+				.collect(Collectors.toList());
+
+		sortStrategy.sort(results);
+
+		System.out.println("\n--- Filtered & Sorted Results (" + results.size() + " found) ---");
+		for (int i = 0; i < results.size(); i++) {
+			System.out.println("[" + (i + 1) + "] " + results.get(i).getName() 
+					+ " (Added: " + results.get(i).getTimeStamp().toLocalDate() + ")");
+			if (!results.get(i).getTags().isEmpty()) {
+				System.out.println("    Tags: " + results.get(i).getTags());
+			}
+		}
+		System.out.println("---------------------------------------");
+	}
 
 //	  Handles the menu before the user logs in and return the Guest intent as a boolean.
 	public static boolean handleGuestMenu() {
