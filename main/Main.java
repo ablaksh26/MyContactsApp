@@ -21,6 +21,13 @@ import authentication.providers.AuthProvider;
 import authentication.Authentication;
 import userfunction.storage.UserFileManager;
 
+import phone.model.Contact;
+import phone.model.EmailAddress;
+import phone.model.Organization;
+import phone.model.Person;
+import phone.model.PhoneNumber;
+import phone.storage.ContactFileManager;
+
 import userfunction.command.ChangePasswordCommand;
 import userfunction.command.ProfileCommand;
 import userfunction.command.ProfileUpdateController;
@@ -32,9 +39,9 @@ import userfunction.command.UpdateUserNameCommand;
 /*
  
    @author: Abhilaksh
-   @version: UC3
+   @version: UC4
    
-   "This Usecase allows User to update profile information, change password, or manage preferences."
+   " User adds a new contact with name, phone numbers, email addresses, and optional fields."
 */
 
 public class Main {
@@ -166,6 +173,125 @@ public class Main {
 			System.out.println("Login Failed: Please enter valid credentials");
 		}
 		
+	}
+
+		public static void createNewContactFlow(User activeUser) {
+		System.out.println("\n---Create New Contact---");
+		System.out.println("1. Person");
+		System.out.println("2. Organization");
+		System.out.println("0. Exit");
+		System.out.print("Your Choice: ");
+		String type = scanner.nextLine();
+
+		if(type.equals("0")) {
+			System.out.println("Exiting...");
+		}
+
+		if(!type.equals("1") && !type.equals("2")) {
+			System.out.println("Invalid User Type!!");
+			return;
+		}
+
+		System.out.print("Enter Name: ");
+		String name = scanner.nextLine();
+
+		List<PhoneNumber> phones = new ArrayList<>();
+		while(true) {
+			System.out.print("Add phone number(y/n): ");
+			if(!scanner.nextLine().equalsIgnoreCase("y")) break;
+
+			System.out.print("Enter Label: ");
+			String label = scanner.nextLine();
+
+			System.out.print("Enter Number: ");
+			String number = scanner.nextLine();
+
+			try {
+				UserValidator.validatePhoneNumber(number);
+
+			}catch(Exception e) {
+				System.out.println("Error: " + e.getMessage());
+				System.out.println("Try Again!!");
+				continue;
+			}
+
+			PhoneNumber phoneNumber = new PhoneNumber(label, number);
+
+			phones.add(phoneNumber);
+		}
+
+		List<EmailAddress> emails = new ArrayList<>();
+		while(true) {
+			System.out.print("Add email(y/n): ");
+			if(!scanner.nextLine().equals("y")) break;
+
+			System.out.print("Enter Label: ");
+			String label = scanner.nextLine();
+
+			System.out.print("Enter Email Address: ");
+			String email = scanner.nextLine();
+
+			try {
+				UserValidator.validateEmail(email);
+
+			}catch(Exception e) {
+				System.out.println("Error: " + e.getMessage());
+				System.out.println("Try Again!!");
+				continue;
+			}
+
+			EmailAddress emailAddress = new EmailAddress(label, email);
+
+			emails.add(emailAddress);
+		}
+
+		Contact newContact = null;
+
+		try {
+			if("1".equals(type)) {
+				System.out.print("Enter Relationship: ");
+				String relationship = scanner.nextLine();
+
+				newContact =  new Person.PersonBuilder().setName(name)
+						.setRelationsip(relationship)
+						.build();
+
+			}else if("2".equals(type)) {
+				System.out.print("Enter Website: ");
+				String website = scanner.nextLine();
+
+				System.out.print("Enter Industry: ");
+				String industry = scanner.nextLine();
+
+				newContact = new Organization.OrganizationBuilder().setName(name)
+						.setWebsite(website)
+						.setIndustry(industry)
+						.build();
+			}
+
+			if(!(newContact == null)) {
+				for(PhoneNumber phoneNumber : phones) {
+					newContact.addPhoneNumber(phoneNumber);
+				}
+
+				for(EmailAddress emailAddress : emails) {
+					newContact.addEmailAddress(emailAddress);
+				}
+
+				activeUser.getContacts().add(newContact);
+
+				ContactFileManager.saveContacts(activeUser);
+
+				System.out.println("\n" + newContact.getContactSummary());
+				System.out.println("Contact created and saved!!");
+			}
+		}catch(IllegalArgumentException e) {
+			System.out.println("Failed to create contact: " + e.getMessage());
+
+		}catch(Exception e) {
+			System.out.println("Uexpected Error: " + e.getMessage());
+
+		}
 	}
 
 //	  Handles the menu before the user logs in and return the Guest intent as a boolean.
@@ -304,9 +430,49 @@ public class Main {
 ;		}
 	}
 
+	public static void handleContactMenu() {
+		boolean inContactMenu = true;
+		
+		while(inContactMenu) {
+			User activeUser = SessionManager.getInstance().getCurrentUser().get();
+			
+			scanner.nextLine();
+			
+			System.out.println("\n---Contact Menu---");
+			System.out.println("You have " + activeUser.getContacts().size() + " contacts saved.");
+			System.out.println("------------------");
+			System.out.println("1. Create a contact");
+			System.out.println("2. View a contact");
+			System.out.println("0. Back to user dashboard");
+			System.out.print("Enter Choice: ");
+			
+			String input = scanner.nextLine();
+			
+			inContactMenu = switch(input) {
+				case "1" -> {
+					createNewContactFlow(activeUser);
+					yield true;
+				}
+				case "2" -> {
+					System.out.println("To be implemented...");
+					yield true;
+				}
+				case "0" -> {
+					System.out.println("Returning to dashboard...");
+					yield false;
+				}
+				default -> {
+					System.out.println("Invalid Choice!!");
+					yield true;
+				}
+			};
+		}
+	}
 	
 	public static boolean handleUserMenu() {
 		User activeUser = SessionManager.getInstance().getCurrentUser().get();
+		
+		ContactFileManager.loadContacts(activeUser);
 		
 		System.out.println("\n---Main Menu (Logged in as " + activeUser.getEmail() +")---");
 		System.out.println("1. Profile Management");
@@ -315,27 +481,27 @@ public class Main {
 
 		System.out.print("Enter Choice: ");
 		int input = scanner.nextInt();
-		
+
 		return switch(input) {
-			case 1 -> {
-				handleProfileMenu();
-				yield true;
-			}
-			case 2 -> {
-				System.out.println("To be implemented");
-				yield true;
-			}
-			case 0 -> {
-				System.out.println("Logging out...");
-				SessionManager.getInstance().logoutUser();
-				yield true;
-			}
-			default -> {
-				System.out.println("Invalid Choice!!");
-				yield true;
-			}
+		case 1 -> {
+			handleProfileMenu();
+			yield true;
+		}
+		case 2 -> {
+			handleContactMenu();
+			yield true;
+		}
+		case 0 -> {
+			System.out.println("Logging out...");
+			SessionManager.getInstance().logoutUser();
+			yield true;
+		}
+		default -> {
+			System.out.println("Invalid Choice!!");
+			yield true;
+		}
 		};
-		
+
 	}
 
 	public static void main(String[]args) {
