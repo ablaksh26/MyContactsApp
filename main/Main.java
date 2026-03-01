@@ -1,5 +1,9 @@
-package com.main;
+package main;
+
+
 import java.util.Scanner;
+import java.util.Map;
+import java.util.Optional;
 
 import userfunction.model.User;
 import userfunction.model.UserBuilder;
@@ -10,21 +14,27 @@ import userfunction.validation.InvalidEmailException;
 import userfunction.validation.InvalidPhoneNumberException;
 import userfunction.validation.UserValidator;
 import userfunction.validation.WeakPasswordException;
+import authentication.authfunctions.BasicAuthFunction;
+import authentication.authfunctions.OAuthFunction;
+import authentication.session.SessionManager;
+import authentication.providers.AuthProvider;
+import authentication.Authentication;
+import userfunction.storage.UserFileManager;
 
 /*
  
    @author: Abhilaksh
-   @version: UC1
+   @version: UC2
    
-   The Main file for the User Registration , the Contacts app function and the exit.
- */
+   The Main file, now implements the Login function and also handles the logged in User.
+*/
 
 public class Main {
 	
 	private static final Scanner sc = new Scanner(System.in);
 	private static final PasswordHasher hasher = new PasswordHasher();
 	
-	private static User loggedInUser = null;
+	private static final Map<String, User> userDatabase = UserFileManager.loadData();
 	
 	public static void userRegistration() {
 		sc.nextLine();
@@ -62,6 +72,9 @@ public class Main {
 											.setProfileInfo(newProfile)
 											.setUserType(type.toUpperCase())
 											.build();
+
+			userDatabase.put(newUser.getEmail(), newUser);
+			UserFileManager.saveData(userDatabase);
 			
 			System.out.println("------User Registered-------");
 			System.out.println("Email: " + newUser.getEmail());
@@ -81,6 +94,72 @@ public class Main {
 	}
 	
 
+	public static void userLogin() {
+		System.out.println("\n---Login---");
+		
+		scanner.nextLine();
+		
+		System.out.print("Enter Email: ");
+		String email = scanner.nextLine();
+		
+		User userLoginAttempt = userDatabase.get(email);
+		
+		if(userLoginAttempt == null) {
+			System.out.println("User not found. Please register first!!");
+			return;
+		}
+		
+		boolean isPremium = "PREMIUM".equalsIgnoreCase(userLoginAttempt.getAccountTier());
+		
+		System.out.println("Select Auth method: ");
+		System.out.println("1. Password");
+		
+		if(isPremium) {
+			System.out.println("2. OAuth Token (AuthProvider) [Unlocked]");
+		}else {
+			System.out.println("2. OAuth Token (AuthProvider) [Locked - Premium only]");
+		}
+		
+		
+		System.out.print("Choice: ");
+		String method = scanner.nextLine();
+		
+		Authentication authStrategy;
+		String secret;
+		
+		if("2".equals(method)) {
+			if(!isPremium) {
+				System.out.println("You must be a premium user to access OAuth services. Please use password instead.");
+				return;
+			}
+			
+			System.out.println("\n[Redirecting to AuthProvider...]");
+			String generatedToken = AuthProvider.generateToken(email);
+			System.out.println("[AuthProvider] Authentication Successful. Your token is " + generatedToken);
+			System.out.println("[Redirecting back to MyContactsApp.....]");
+			
+			authStrategy = new OAuthStrategy(userDatabase);
+			
+			System.out.print("Please paste your OAuth Token to finalize login: ");
+			secret = scanner.nextLine();
+		}else {
+			authStrategy = new BasicAuthStrategy(userDatabase, hasher);
+			
+			System.out.print("Enter password: ");
+			secret = scanner.nextLine();
+		}
+		
+		Optional<User> loginResult = authStrategy.authenticate(email, secret);
+		
+		if(loginResult.isPresent()) {
+			SessionManager.getInstance().loginUser(loginResult.get());
+			System.out.println("Login Successful");
+		}else {
+			System.out.println("Login Failed: Please enter valid credentials");
+		}
+		
+	}
+
 //	  Handles the menu before the user logs in and return the Guest intent as a boolean.
 	public static boolean handleGuestMenu() {
 		System.out.println("---User Menu---");
@@ -99,7 +178,7 @@ public class Main {
 				yield true;
 			}
 			case 2 -> {
-				System.out.println("Login will be implemented soon");
+				userLogin();
 				yield true;
 			}
 			
@@ -113,6 +192,44 @@ public class Main {
 				yield true;
 			}
 		};
+
+	}
+
+
+	public static boolean handleUserMenu() {
+		User activeUser = SessionManager.getInstance().getCurrentUser().get();
+		UserProfile profile = activeUser.getProfileInfo();
+		
+		System.out.println("\n---Main Menu (Logged in as " + activeUser.getEmail() +")---");
+		System.out.println("1. Profile Management");
+		System.out.println("0. logout");
+
+		System.out.print("Enter Choice: ");
+		int input = scanner.nextInt();
+		
+		return switch(input) {
+			case 1 -> {
+				System.out.println("Profile Info:-\n" + activeUser.getProfileInfo().toString());
+				
+				if(profile.getAadharNumber() != null && profile.getBankDetails() != null) {
+					System.out.println("Linked Aadhar: " + profile.getAadharNumber());
+					System.out.println("Linked Bank: " + profile.getBankDetails());
+				} else {
+					System.out.println("[Message] Login using AuthProvider to link bank and aadhar detials");
+				}
+				yield true;
+			}
+			case 0 -> {
+				System.out.println("Logging out...");
+				SessionManager.getInstance().logoutUser();
+				yield true;
+			}
+			default -> {
+				System.out.println("Invalid Choice!!");
+				yield true;
+			}
+		};
+		
 	}
 	
 	public static void main(String[]args) {
@@ -121,8 +238,11 @@ public class Main {
 		boolean isRunning = true;
 		
 		while(isRunning) {
-			if(loggedInUser == null) {
+			if(!SessionManager.getInstance().isLoggedIn()) {
 				isRunning = handleGuestMenu();
+			}
+			else {
+				isRunning = handleUserMenu();
 			}
 		}
 		
