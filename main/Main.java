@@ -21,12 +21,20 @@ import authentication.providers.AuthProvider;
 import authentication.Authentication;
 import userfunction.storage.UserFileManager;
 
+import userfunction.command.ChangePasswordCommand;
+import userfunction.command.ProfileCommand;
+import userfunction.command.ProfileUpdateController;
+import userfunction.command.UpdateBioCommand;
+import userfunction.command.UpdatePhoneNumberCommand;
+import userfunction.command.UpdateTierCommand;
+import userfunction.command.UpdateUserNameCommand;
+
 /*
  
    @author: Abhilaksh
-   @version: UC2
+   @version: UC3
    
-   The Main file, now implements the Login function and also handles the logged in User.
+   "This Usecase allows User to update profile information, change password, or manage preferences."
 */
 
 public class Main {
@@ -195,13 +203,114 @@ public class Main {
 
 	}
 
+	public static void handleProfileMenu() {
+		boolean inProfileMenu = true;
+		
+		while(inProfileMenu) {
+			User activeUser = SessionManager.getInstance().getCurrentUser().get();
+			UserProfile profile = activeUser.getProfileInfo();
+			
+			System.out.println("---Profile Management---");
+			System.out.println("Username: " + profile.getUsername());
+			System.out.println("Bio: " + profile.getBio());
+			System.out.println("Bio: " + profile.getPhoneNumber());
+			System.out.println("Current Tier: " + activeUser.getAccountTier());
+			
+			if(profile.getAadharNumber() != null) {
+				System.out.println("Linked Aadhar: " + profile.getAadharNumber());
+				System.out.println("Linked Bank: " + profile.getBankDetails());
+			}
+			System.out.println("------------------------");
+			System.out.println("1. Update username");
+			System.out.println("2. Update bio/status");
+			System.out.println("3. Update phone number");
+			System.out.println("4. Change password");
+			System.out.println("5. Upgrade to PREMIUM");
+			System.out.println("6. Undo last action");
+			System.out.println("0. Back to user dashboard");
+			System.out.print("Enter choice: ");
+			
+			String input = scanner.nextLine();
+			
+			inProfileMenu = switch(input) {
+				case "1" -> {
+					System.out.print("Enter new username: ");
+					String newName = scanner.nextLine();
+					
+					ProfileCommand nameCmd = new UpdateUserNameCommand(activeUser.getProfileInfo(), newName);
+					ProfileUpdateController.executeCommand(nameCmd);
+					
+					UserFileManager.saveData(userDatabase);
+					yield true;
+				}
+				case "2" -> {
+					System.out.print("Enter new bio: ");
+					String newBio = scanner.nextLine();
+					
+					ProfileCommand bioCmd = new UpdateBioCommand(activeUser.getProfileInfo(), newBio);
+					ProfileUpdateController.executeCommand(bioCmd);
+					
+					UserFileManager.saveData(userDatabase);
+					yield true;
+				}
+				case "3" -> {
+					System.out.print("Enter new phone number: ");
+					String newPhoneNumber = scanner.nextLine();
+					
+					try {
+						UserValidator.validatePhoneNumber(newPhoneNumber);
+					} catch (InvalidPhoneNumberException e) {
+						System.out.println(e.getMessage());
+					}
+					
+					ProfileCommand phoneCmd = new UpdatePhoneNumberCommand(activeUser.getProfileInfo(), newPhoneNumber);
+					ProfileUpdateController.executeCommand(phoneCmd);
+					
+					UserFileManager.saveData(userDatabase);
+					yield true;
+				}
+				case "4" -> {
+					System.out.print("Enter new password: ");
+					String newPassword = scanner.nextLine();
+					
+					ProfileCommand passCmd = new ChangePasswordCommand(activeUser, newPassword, hasher);
+					ProfileUpdateController.executeCommand(passCmd);
+					
+					UserFileManager.saveData(userDatabase);
+					yield true;
+				}
+				case "5" -> {
+					ProfileCommand tierCmd = new UpdateTierCommand(userDatabase, activeUser);
+					ProfileUpdateController.executeCommand(tierCmd);
+					
+					UserFileManager.saveData(userDatabase);
+					yield true;
+				}
+				case "6" -> {
+					ProfileUpdateController.undoCommand();
+					
+					UserFileManager.saveData(userDatabase);
+					yield true;
+				}
+				case "0" -> {
+					System.out.println("Returning to dashboard...");
+					yield false;
+				}
+				default -> {
+					System.out.println("Invalid Choice!!");
+					yield true;
+				}
+			}
+;		}
+	}
 
+	
 	public static boolean handleUserMenu() {
 		User activeUser = SessionManager.getInstance().getCurrentUser().get();
-		UserProfile profile = activeUser.getProfileInfo();
 		
 		System.out.println("\n---Main Menu (Logged in as " + activeUser.getEmail() +")---");
 		System.out.println("1. Profile Management");
+		System.out.println("2. Contact Management");
 		System.out.println("0. logout");
 
 		System.out.print("Enter Choice: ");
@@ -209,14 +318,11 @@ public class Main {
 		
 		return switch(input) {
 			case 1 -> {
-				System.out.println("Profile Info:-\n" + activeUser.getProfileInfo().toString());
-				
-				if(profile.getAadharNumber() != null && profile.getBankDetails() != null) {
-					System.out.println("Linked Aadhar: " + profile.getAadharNumber());
-					System.out.println("Linked Bank: " + profile.getBankDetails());
-				} else {
-					System.out.println("[Message] Login using AuthProvider to link bank and aadhar detials");
-				}
+				handleProfileMenu();
+				yield true;
+			}
+			case 2 -> {
+				System.out.println("To be implemented");
 				yield true;
 			}
 			case 0 -> {
@@ -231,7 +337,7 @@ public class Main {
 		};
 		
 	}
-	
+
 	public static void main(String[]args) {
 		System.out.println("///////////////////////// Welcome to MyContactsApp ///////////////////////");
 		
