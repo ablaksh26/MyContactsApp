@@ -59,9 +59,9 @@ import com.seveneleven.mycontactapp.contact.command.ContactCommand;
 /*
  
    @author: Abhilaksh
-   @version: UC10
+   @version: UC11
    
-   "User applies multiple filters (by tag, date added, frequently contacted)."
+   "Creating and Managing Tags."
 */
 
 public class Main {
