@@ -10,7 +10,6 @@ import userfunction.validation.InvalidEmailException;
 import userfunction.validation.InvalidPhoneNumberException;
 import userfunction.validation.UserValidator;
 import userfunction.validation.WeakPasswordException;
-
 /*
  
    @author: Abhilaksh
