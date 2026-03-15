@@ -8,6 +8,7 @@ public class UserBuilder {
 	private String userType = "FREE";
 
 
+	
 	// The getters and the setters function for attributes.
 	
 	public String getEmail() { return email; }
