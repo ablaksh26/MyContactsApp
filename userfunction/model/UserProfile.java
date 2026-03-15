@@ -12,6 +12,7 @@ public class UserProfile {
 		this.bio = builder.getBio();
 		this.phoneNumber = builder.getPhoneNumber();
 	}
+
 	
 	public String getUsername() { return username; }
 
