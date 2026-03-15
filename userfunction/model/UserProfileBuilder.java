@@ -12,6 +12,7 @@ public class UserProfileBuilder {
 	private String phoneNumber;
 	
 
+	
 	public String getUsername() { return username; }
 
 	public String getBio() { return bio; }
